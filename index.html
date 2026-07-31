@@ -11,6 +11,20 @@
   .keys{display:flex;gap:26px;flex-wrap:wrap;justify-content:center;color:#a8a4bc}
   b{color:#ffcf6e}
   a{color:#8fd0ff}
+  button,.btn{font:inherit;padding:8px 14px;border-radius:6px;border:1px solid #3a3550;
+       background:#221f31;color:#e8e4f4;cursor:pointer;text-decoration:none}
+  button:hover,.btn:hover{background:#2e2a42}
+  .btn.go{background:#3c7d5a;border-color:#4f9a72;color:#fff;font-weight:600}
+  #report{position:fixed;inset:0;background:#080711ee;display:none;place-items:center;padding:20px;z-index:9}
+  #report[open]{display:grid}
+  #report .box{background:#17141f;border:1px solid #322c48;border-radius:10px;padding:20px;
+       max-width:640px;width:100%;display:flex;flex-direction:column;gap:12px}
+  #report h3{margin:0;color:#ffcf6e}
+  #report textarea{width:100%;font:inherit;padding:10px;border-radius:6px;resize:vertical;
+       background:#0e0c16;color:#e8e4f4;border:1px solid #322c48}
+  #report img{width:100%;border-radius:6px;border:1px solid #322c48}
+  #report .row{display:flex;gap:10px;flex-wrap:wrap}
+  #hint{margin:0;color:#8a86a0;font-size:13px}
 </style>
 
 <h1>Feline Brothers <small>— after <i>The Story of the Amulet</i>, E. Nesbit, 1906</small></h1>
@@ -19,6 +33,22 @@
   <span>🐱 <b>A D</b> move · <b>W</b> jump ×2 · <b>S</b> drop</span>
   <span>🐯 <b>← →</b> move · <b>↑</b> jump · <b>↓</b> drop</span>
   <span><b>Q</b> Psammead's wish · <b>R</b> restart · <b>Enter</b> continue · <b>M</b> mute</span>
+  <span><button id=bugbtn>🐞 Report a bug (B)</button></span>
+</div>
+
+<div id=report>
+  <div class=box>
+    <h3>Report a bug</h3>
+    <textarea id=bugtext rows=4 placeholder="What went wrong? What did you expect to happen?"></textarea>
+    <img id=shot alt="the frame you were looking at">
+    <div class=row>
+      <a id=send class="btn go" target=_blank rel=noopener>Copy shot &amp; open GitHub issue</a>
+      <button id=savebtn>Save the screenshot</button>
+      <button id=cancelbtn>Cancel (Esc)</button>
+    </div>
+    <p id=hint>Where you are in the game is filled in for you. The screenshot goes on your
+       clipboard — paste it into the issue with Ctrl+V (⌘V).</p>
+  </div>
 </div>
 
 <script>
@@ -282,9 +312,16 @@ const mx = mask.getContext('2d');
 
 const keys = {}, hit = {};
 const HELD = ['KeyA','KeyD','KeyW','KeyS','ArrowLeft','ArrowRight','ArrowUp','ArrowDown','KeyQ','KeyR','KeyM','Enter','Space'];
-onkeydown = e => { if (HELD.includes(e.code)) e.preventDefault();
-                   audioOn();
-                   if (!keys[e.code]) hit[e.code] = 1; keys[e.code] = 1; };
+onkeydown = e => {
+  if (reporting) {                                         // let the player type
+    if (e.code === 'Escape') closeReport();
+    return;
+  }
+  if (e.code === 'KeyB') { openReport(); return; }
+  if (HELD.includes(e.code)) e.preventDefault();
+  audioOn();
+  if (!keys[e.code]) hit[e.code] = 1; keys[e.code] = 1;
+};
 onkeyup = e => keys[e.code] = 0;
 
 let mode = 'title', li = 0, era, map, W, H, cat, tiger, foes, tokens, doorway,
@@ -658,6 +695,7 @@ function card(title, sub, body, foot, accent) {
 
 // ---------------------------------------------------------------- loop
 function step(dt) {
+  if (reporting) { for (const k in keys) keys[k] = 0; return; }
   time += dt;
   if (shake > 0) shake -= dt;
 
@@ -767,6 +805,65 @@ function render() {
       'The halves knew each other, as the Psammead said they would. Nesbit ends her story not with treasure but with a wish already quietly granted — the thing the brothers wanted was waiting at home the whole time.',
       'The Story of the Amulet, E. Nesbit, 1906. Out of copyright and free to read at gutenberg.org.', '#a8ffcf');
 }
+
+// ---------------------------------------------------------------- bug reports
+// No backend: the report opens a prefilled GitHub issue and puts the frame on
+// the clipboard, because issue URLs can carry text but not images.
+const REPO = 'korjavin/brothersgame';
+const panel = document.getElementById('report'), shot = document.getElementById('shot'),
+      bugtext = document.getElementById('bugtext'), sendLink = document.getElementById('send'),
+      hintP = document.getElementById('hint');
+let reporting = false;
+
+function whereAmI() {
+  const pos = p => `${(p.x / TS).toFixed(1)},${(p.y / TS).toFixed(1)}`;
+  return [
+    `level ${li + 1}/6 — ${era.title} (${era.key}), screen "${mode}"`,
+    `cat ${pos(cat)} · tiger ${pos(tiger)} · hearts ${hearts} · shards ${score}`,
+    `wish ${wishT > 0 ? 'active' : wish ? 'unused' : 'spent'}` +
+      (water ? ` · flood at row ${(water.y / TS).toFixed(1)}` : '') +
+      ` · sound ${SND.on ? 'on' : 'muted'}`,
+    `${screen.width}×${screen.height} · ${navigator.userAgent}`,
+  ].join('\n');
+}
+
+function refreshLink() {
+  const said = bugtext.value.trim();
+  const title = said ? said.split('\n')[0].slice(0, 72) : `Bug in ${era.title}`;
+  const body = `**What happened**\n${said || '(describe it here)'}\n\n` +
+    `**Screenshot** — paste it here with Ctrl+V (⌘V)\n\n\n` +
+    `**Where**\n\`\`\`\n${whereAmI()}\n\`\`\`\n`;
+  sendLink.href = `https://github.com/${REPO}/issues/new?labels=bug` +
+    `&title=${encodeURIComponent(title)}&body=${encodeURIComponent(body)}`;
+}
+
+function openReport() {
+  reporting = true;
+  panel.setAttribute('open', '');
+  shot.src = cv.toDataURL('image/png');
+  refreshLink();
+  bugtext.focus();
+}
+function closeReport() { reporting = false; panel.removeAttribute('open'); }
+
+bugtext.oninput = refreshLink;
+document.getElementById('bugbtn').onclick = openReport;
+document.getElementById('cancelbtn').onclick = closeReport;
+document.getElementById('savebtn').onclick = () => {
+  const a = document.createElement('a');
+  a.href = cv.toDataURL('image/png');
+  a.download = `feline-brothers-${era.key}.png`;
+  a.click();
+};
+sendLink.onclick = () => {                     // the link navigates either way
+  try {
+    navigator.clipboard.write([new ClipboardItem({ 'image/png': new Promise(res => cv.toBlob(res)) })])
+      .then(() => hintP.textContent = 'Screenshot copied — paste it into the issue with Ctrl+V (⌘V).')
+      .catch(() => hintP.textContent = 'Clipboard blocked. Use "Save the screenshot" and drag the file into the issue.');
+  } catch {
+    hintP.textContent = 'This browser will not copy images. Use "Save the screenshot" and drag the file in.';
+  }
+};
 
 let last = 0;
 function frame(now) {

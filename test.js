@@ -10,7 +10,9 @@ const ctx2d = new Proxy({}, {
     : k === 'canvas' ? { width: 960, height: 544 } : (() => {}),
   set: () => true,
 });
-const el = { width: 960, height: 544, getContext: () => ctx2d };
+const el = { width: 960, height: 544, getContext: () => ctx2d, value: '',
+             toDataURL: () => 'data:image/png;base64,iVBORw0KGgo=', toBlob: cb => cb({}),
+             setAttribute() {}, removeAttribute() {}, focus() {}, click() {} };
 
 // ---- fake web audio, recording every voice that gets scheduled -------------
 const notes = [];
@@ -34,7 +36,9 @@ class FakeAudio {
 }
 
 const sandbox = { document: { getElementById: () => el, createElement: () => el },
-                  requestAnimationFrame: () => {}, console, Math, Date, AudioContext: FakeAudio };
+                  requestAnimationFrame: () => {}, console, Math, Date, AudioContext: FakeAudio,
+                  screen: { width: 1920, height: 1080 }, navigator: { userAgent: 'node-test' },
+                  ClipboardItem: class {} };
 sandbox.window = sandbox;
 vm.createContext(sandbox);
 vm.runInContext(src + `
@@ -43,6 +47,8 @@ vm.runInContext(src + `
   get hearts(){return hearts}, set hearts(v){hearts=v}, get score(){return score},
   get cat(){return cat}, get tiger(){return tiger}, get foes(){return foes}, get tokens(){return tokens},
   get map(){return map}, get doorway(){return doorway}, get water(){return water},
+  openReport, closeReport, refreshLink, whereAmI, get sendLink(){return sendLink}, get bugtext(){return bugtext},
+  get reporting(){return reporting},
   get W(){return W}, get H(){return H} };`, sandbox);
 
 const S = sandbox.__G, TS = S.TS;
@@ -131,7 +137,32 @@ while (queue.length) {
 ok(seen.has(ledges.indexOf(ledges.find(l => l.y === 3))), 'atlantis: the arch ledge cannot be climbed to');
 console.log(`  ok atlantis  ${seen.size}/${ledges.length} ledges reachable, arch included`);
 
-// ---- 3. sound -------------------------------------------------------------
+// ---- 3. bug reports -------------------------------------------------------
+console.log('\nbug report');
+S.mode = 'play'; S.li = 1; S.loadLevel(1);
+S.openReport();
+check(S.reporting === true, 'B pauses the game and opens the panel');
+const beforeKeys = { ...S.keys };
+S.keys.KeyD = 1; tick(5);
+check(S.cat.x === S.cat.x && S.keys.KeyD === 0, 'held keys are dropped while reporting');
+
+S.bugtext.value = 'The tiger fell through the pyramid steps\nsecond line';
+S.refreshLink();
+const href = S.sendLink.href;
+check(href.startsWith('https://github.com/korjavin/brothersgame/issues/new?labels=bug'),
+      'the link opens a prefilled GitHub issue');
+check(decodeURIComponent(href).includes('The tiger fell through'), "the player's words are carried over");
+check(decodeURIComponent(href).includes('egypt'), 'the era is attached automatically');
+check(decodeURIComponent(href).includes('hearts'), 'game state is attached automatically');
+check(href.length < 8000, `the URL stays under browser limits (${href.length} chars)`);
+
+S.bugtext.value = 'x'.repeat(400); S.refreshLink();
+const title = decodeURIComponent(new URL(S.sendLink.href).searchParams.get('title'));
+check(title.length <= 72, `a long report still gets a short title (${title.length} chars)`);
+S.closeReport();
+check(S.reporting === false, 'Esc/Cancel resumes the game');
+
+// ---- 4. sound -------------------------------------------------------------
 console.log('\nsound');
 const runSeconds = sec => { for (let i = 0; i < sec * 60; i++) { clock += 1 / 60; S.pumpMusic(); } };
 notes.length = 0;

@@ -52,4 +52,26 @@ Maps are run-specs, not ASCII art, so columns line up by construction:
 
 Open the console to see the collision self-check run on load.
 
+## Reporting a bug
+
+Press **B** in the game. You get a text box and the exact frame you were looking at. "Copy shot &
+open GitHub issue" puts the screenshot on your clipboard and opens a
+[prefilled issue](https://github.com/korjavin/brothersgame/issues/new?labels=bug) — paste the image
+in with Ctrl+V and submit. Level, positions, hearts, shards, flood height, sound state and browser
+are filled in for you, so "it broke in Atlantis" arrives reproducible.
+
+No server is involved: a static page can prefill an issue URL but cannot upload an image, hence the
+clipboard step. "Save the screenshot" is the fallback when a browser refuses clipboard access.
+
+## Tests
+
+```
+node test.js
+```
+
+No dependencies — it fakes a canvas and Web Audio, then runs the real game: a bot walks all six
+levels to their arch, Atlantis's climb is proved reachable ledge by ledge, the sequencer is checked
+for tempo and mute, and the bug-report link is checked for shape and length. Run it after editing a
+level; that is what catches an unjumpable gap.
+
 MIT.
