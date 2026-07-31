@@ -18,7 +18,7 @@
 <div class=keys>
   <span>🐱 <b>A D</b> move · <b>W</b> jump ×2 · <b>S</b> drop</span>
   <span>🐯 <b>← →</b> move · <b>↑</b> jump · <b>↓</b> drop</span>
-  <span><b>Q</b> Psammead's wish · <b>R</b> restart · <b>Enter</b> continue</span>
+  <span><b>Q</b> Psammead's wish · <b>R</b> restart · <b>Enter</b> continue · <b>M</b> mute</span>
 </div>
 
 <script>
@@ -177,6 +177,102 @@ future: build(64, 15, {
 }),
 };
 
+// ---------------------------------------------------------------- sound
+// Everything is synthesised: two pulse voices, a triangle bass and a noise kit.
+// Lead/bass patterns are semitone offsets from the era's root; null is a rest.
+const SONGS = {
+  london:   { bpm: 138, root: 60,
+              lead: [0, 4, 7, 12, 11, 7, 9, 7, 5, 9, 12, 9, 7, 4, 2, null],
+              bass: [0, null, 7, null, -5, null, 0, null] },
+  egypt:    { bpm: 126, root: 57,
+              lead: [0, 1, 5, 8, 7, 5, 1, 0, null, 1, 5, 7, 8, 7, 5, 1],
+              bass: [0, 0, null, 0, -4, -4, null, 0] },
+  babylon:  { bpm: 144, root: 55,
+              lead: [0, 3, 7, 10, 7, 3, 0, null, 0, 3, 7, 12, 10, 7, 3, 0],
+              bass: [0, null, 0, null, 3, null, 3, null] },
+  atlantis: { bpm: 170, root: 59,
+              lead: [0, 3, 7, 12, 15, 12, 7, 3, 0, 3, 8, 12, 15, 12, 8, 3],
+              bass: [0, 0, 0, 0, -2, -2, -2, -2] },
+  britain:  { bpm: 104, root: 52,
+              lead: [0, null, 3, null, 7, null, 6, null, 5, null, 3, null, 0, null, null, null],
+              bass: [0, null, null, null, -5, null, null, null] },
+  future:   { bpm: 152, root: 62,
+              lead: [0, 4, 7, 11, 12, 11, 7, 4, 2, 5, 9, 12, 14, 12, 9, 5],
+              bass: [0, 0, 7, 0, 5, 5, 0, 0] },
+};
+
+const SND = { ctx: null, on: true, step: 0, next: 0, song: SONGS.london };
+const now = () => SND.ctx ? SND.ctx.currentTime : 0;
+const hz = n => 440 * Math.pow(2, (n - 69) / 12);
+
+function audioOn() {                       // browsers only allow this after a keypress
+  if (SND.ctx) { if (SND.ctx.state === 'suspended') SND.ctx.resume(); return; }
+  const AC = window.AudioContext || window.webkitAudioContext;
+  if (!AC) return;
+  SND.ctx = new AC();
+  SND.master = SND.ctx.createGain();
+  SND.master.gain.value = .22;
+  SND.master.connect(SND.ctx.destination);
+  SND.noise = SND.ctx.createBuffer(1, 8192, SND.ctx.sampleRate);
+  const d = SND.noise.getChannelData(0);
+  for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+  SND.next = SND.ctx.currentTime;
+}
+
+function blip(midi, at, dur, type = 'square', vol = .18, bend = 0) {
+  if (!SND.ctx || !SND.on) return;
+  const o = SND.ctx.createOscillator(), g = SND.ctx.createGain();
+  o.type = type;
+  o.frequency.setValueAtTime(hz(midi), at);
+  if (bend) o.frequency.exponentialRampToValueAtTime(hz(midi + bend), at + dur);
+  g.gain.setValueAtTime(.0001, at);
+  g.gain.exponentialRampToValueAtTime(vol, at + .01);
+  g.gain.exponentialRampToValueAtTime(.0001, at + dur);
+  o.connect(g); g.connect(SND.master); o.start(at); o.stop(at + dur + .03);
+}
+
+function perc(at, dur = .05, vol = .16, hp = 2000) {
+  if (!SND.ctx || !SND.on) return;
+  const s = SND.ctx.createBufferSource(), g = SND.ctx.createGain(), f = SND.ctx.createBiquadFilter();
+  s.buffer = SND.noise; s.loop = true;
+  f.type = 'highpass'; f.frequency.value = hp;
+  g.gain.setValueAtTime(vol, at);
+  g.gain.exponentialRampToValueAtTime(.0001, at + dur);
+  s.connect(f); f.connect(g); g.connect(SND.master); s.start(at); s.stop(at + dur + .03);
+}
+
+const sfx = {
+  start: () => [0, 7, 12, 19].forEach((n, i) => blip(60 + n, now() + i * .08, .25, 'square', .2)),
+  jump:  isCat => blip(isCat ? 76 : 67, now(), .13, 'square', .15, 7),
+  stomp: () => { blip(79, now(), .1, 'square', .2, -14); perc(now(), .07, .14, 1200); },
+  smash: () => { perc(now(), .22, .3, 500); blip(43, now(), .18, 'sawtooth', .16, -7); },
+  coin:  () => { blip(88, now(), .05, 'square', .14); blip(95, now() + .05, .12, 'square', .14); },
+  hurt:  () => blip(62, now(), .35, 'sawtooth', .2, -14),
+  wish:  () => [0, 4, 7, 12, 16, 19].forEach((n, i) => blip(72 + n, now() + i * .05, .2, 'triangle', .15)),
+  arch:  () => [0, 4, 7, 12].forEach((n, i) => blip(72 + n, now() + i * .1, .35, 'square', .2)),
+};
+
+function playStep(i, at) {
+  const s = SND.song, beat = 60 / s.bpm / 4;
+  const L = s.lead[i % s.lead.length];
+  if (L !== null) blip(s.root + 12 + L, at, beat * .9, 'square', .1);
+  const B = s.bass[i % s.bass.length];
+  if (B !== null) blip(s.root - 12 + B, at, beat * 1.7, 'triangle', .2);
+  if (i % 4 === 0) blip(45, at, .13, 'sine', .3, -12);       // kick
+  if (i % 8 === 4) perc(at, .09, .15, 1200);                 // snare
+  if (i % 2 === 1) perc(at, .025, .05, 6000);                // hat
+}
+
+function pumpMusic() {                     // lookahead scheduler, driven by the frame loop
+  if (!SND.ctx || !SND.on) return;
+  const beat = 60 / SND.song.bpm / 4;
+  if (SND.next < SND.ctx.currentTime) SND.next = SND.ctx.currentTime;
+  while (SND.next < SND.ctx.currentTime + .15) {
+    playStep(SND.step++, SND.next);
+    SND.next += beat;
+  }
+}
+
 // ---------------------------------------------------------------- engine
 const TS = 32, GRAV = 2000, VW = 960, VH = 544;
 const cv = document.getElementById('cv'), ctx = cv.getContext('2d');
@@ -185,8 +281,9 @@ mask.width = VW; mask.height = VH;
 const mx = mask.getContext('2d');
 
 const keys = {}, hit = {};
-const HELD = ['KeyA','KeyD','KeyW','KeyS','ArrowLeft','ArrowRight','ArrowUp','ArrowDown','KeyQ','KeyR','Enter','Space'];
+const HELD = ['KeyA','KeyD','KeyW','KeyS','ArrowLeft','ArrowRight','ArrowUp','ArrowDown','KeyQ','KeyR','KeyM','Enter','Space'];
 onkeydown = e => { if (HELD.includes(e.code)) e.preventDefault();
+                   audioOn();
                    if (!keys[e.code]) hit[e.code] = 1; keys[e.code] = 1; };
 onkeyup = e => keys[e.code] = 0;
 
@@ -220,6 +317,7 @@ function loadLevel(n) {
     else return;
     map[y][x] = '.';
   }));
+  SND.song = SONGS[era.key];
   spawn = { c: c0, t: t0 };
   cat = mkPlayer(...c0, true); tiger = mkPlayer(...t0, false);
   sammy = { x: c0[0], y: c0[1] - 40 };
@@ -247,7 +345,7 @@ function respawn(p) {
 
 function hurt(p, knock) {
   if (p.inv > 0) return;
-  hearts--; shake = .35;
+  hearts--; shake = .35; sfx.hurt();
   if (hearts <= 0) { score = scoreAtStart; hearts = 3; loadLevel(li); return; }
   if (knock) { p.inv = 1.4; p.vy = -320; p.vx = -p.face * 260; }
   else respawn(p);
@@ -276,7 +374,7 @@ function moveAxis(p, dx, dy, dropping) {
 }
 
 function smash(tx, ty) {
-  map[ty][tx] = '.'; shake = .18;
+  map[ty][tx] = '.'; shake = .18; sfx.smash();
   for (let i = 0; i < 10; i++)
     puffs.push({ x: tx * TS + 16, y: ty * TS + 16, vx: (i - 5) * 45,
                  vy: -140 - i * 15, t: .55, c: era.tile[1] });
@@ -290,7 +388,7 @@ function updatePlayer(p, dt, L, Rk, J, Dn, baseJumps) {
   p.vx = ((keys[Rk] ? 1 : 0) - (keys[L] ? 1 : 0)) * (p.cat ? 235 : 195);
   if (p.vx) { p.face = Math.sign(p.vx); p.step += dt * 9; }
   const maxJumps = baseJumps + (wishT > 0 && !p.cat ? 1 : 0);
-  if (hit[J] && p.jumps < maxJumps) { p.vy = p.cat ? -600 : -580; p.jumps++; p.ground = false; }
+  if (hit[J] && p.jumps < maxJumps) { p.vy = p.cat ? -600 : -580; p.jumps++; p.ground = false; sfx.jump(p.cat); }
   if (keys[J] && p.vy < -180) p.vy += g * dt * -0.35;    // hold for a higher hop
   p.vy = Math.min(p.vy + g * dt, 950);
 
@@ -302,7 +400,8 @@ function updatePlayer(p, dt, L, Rk, J, Dn, baseJumps) {
   moveAxis(p, 0, p.vy * dt, keys[Dn]);
 
   p.riding = false;                                     // stand on your brother
-  if (p.vy >= 0 && overlap(p, bro) && footY <= bro.y + 8) {
+  const perch = { x: bro.x - 2, y: bro.y - 2, w: bro.w + 4, h: bro.h + 4 };  // 2px so he doesn't jitter
+  if (p.vy >= 0 && overlap(p, perch) && footY <= bro.y + 8) {
     p.y = bro.y - p.h; p.vy = 0; p.ground = true; p.riding = true;
   }
   if (p.ground) p.jumps = 0;
@@ -319,12 +418,12 @@ function updatePlayer(p, dt, L, Rk, J, Dn, baseJumps) {
 
   for (let i = tokens.length - 1; i >= 0; i--)
     if (Math.hypot(tokens[i].x - p.x - p.w / 2, tokens[i].y - p.y - p.h / 2) < 22) {
-      tokens.splice(i, 1); score++;
+      tokens.splice(i, 1); score++; sfx.coin();
     }
 
   for (const f of foes) {
     if (f.dead || !overlap(p, f)) continue;
-    if (p.vy > 0 && footY - p.vy * dt <= f.y + 10) { f.dead = .4; p.vy = -430; score++; shake = .15; }
+    if (p.vy > 0 && footY - p.vy * dt <= f.y + 10) { f.dead = .4; p.vy = -430; score++; shake = .15; sfx.stomp(); }
     else hurt(p, true);
   }
   // keep both brothers on screen
@@ -562,12 +661,13 @@ function step(dt) {
   time += dt;
   if (shake > 0) shake -= dt;
 
-  if (mode === 'title') { if (hit.Enter) { hearts = 3; score = 0; loadLevel(0); mode = 'play'; } return; }
+  if (hit.KeyM) { SND.on = !SND.on; if (SND.master) SND.master.gain.value = SND.on ? .22 : 0; }
+  if (mode === 'title') { if (hit.Enter) { hearts = 3; score = 0; loadLevel(0); mode = 'play'; sfx.start(); } return; }
   if (mode === 'card')  { if (hit.Enter) mode = 'play'; return; }
   if (mode === 'end')   { if (hit.Enter) { mode = 'title'; } return; }
 
   if (hit.KeyR) { score = scoreAtStart; hearts = 3; loadLevel(li); return; }
-  if (hit.KeyQ && wish) { wish = false; wishT = 8; }
+  if (hit.KeyQ && wish) { wish = false; wishT = 8; sfx.wish(); }
   wishT = Math.max(0, wishT - dt);
 
   updatePlayer(cat, dt, 'KeyA', 'KeyD', 'KeyW', 'KeyS', 2);
@@ -585,6 +685,7 @@ function step(dt) {
   centreCamera(false);
 
   if (overlap(cat, doorway) && overlap(tiger, doorway)) {
+    sfx.arch();
     if (++li >= ERAS.length) { li = ERAS.length - 1; mode = 'end'; }
     else { loadLevel(li); mode = 'card'; }
   }
@@ -670,7 +771,7 @@ function render() {
 let last = 0;
 function frame(now) {
   const dt = Math.min((now - last) / 1000, .033); last = now;
-  step(dt); render();
+  step(dt); render(); pumpMusic();
   for (const k in hit) delete hit[k];
   requestAnimationFrame(frame);
 }
