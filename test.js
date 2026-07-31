@@ -137,7 +137,44 @@ while (queue.length) {
 ok(seen.has(ledges.indexOf(ledges.find(l => l.y === 3))), 'atlantis: the arch ledge cannot be climbed to');
 console.log(`  ok atlantis  ${seen.size}/${ledges.length} ledges reachable, arch included`);
 
-// ---- 3. bug reports -------------------------------------------------------
+// ---- 3. the crate barriers are a real gate, not a hurdle -------------------
+// github#1: they used to be two tiles tall, and either brother simply jumped them.
+console.log('\nbarriers');
+const GROUND = 13 * TS;
+for (const [i, key, col] of [[0, 'london', 22], [1, 'egypt', 45], [2, 'babylon', 20], [4, 'britain', 24]]) {
+  const wallX = col * TS;
+  const park = () => {
+    S.mode = 'play'; S.li = i; S.loadLevel(i); S.hearts = 3;
+    S.cat.x = wallX - 120; S.cat.y = GROUND - S.cat.h;
+    S.tiger.x = wallX - 150; S.tiger.y = GROUND - S.tiger.h;
+    S.cam.x = Math.max(0, wallX - 600);
+  };
+
+  park();                                             // the cat, trying everything
+  let best = 0;
+  for (let f = 0; f < 60 * 6; f++) {
+    S.keys.KeyD = 1;
+    if (f % 18 === 0) S.hit.KeyW = 1;                 // spam single and double jumps
+    S.keys.KeyW = S.cat.vy < -120 ? 1 : 0;
+    S.cat.inv = 99;                                   // foes are not what is under test
+    S.step(1 / 60);
+    for (const k in S.hit) delete S.hit[k];
+    best = Math.max(best, S.cat.x);
+  }
+  S.keys.KeyD = S.keys.KeyW = 0;
+  check(best + S.cat.w <= wallX + 1, `${key.padEnd(8)} the cat cannot jump the barrier (stopped at ${best.toFixed(0)}, wall at ${wallX})`);
+
+  park();                                             // the tiger, walking straight at it
+  for (let f = 0; f < 60 * 5; f++) {
+    S.keys.ArrowRight = 1; S.tiger.inv = 99;
+    S.step(1 / 60);
+    for (const k in S.hit) delete S.hit[k];
+  }
+  S.keys.ArrowRight = 0;
+  check(S.tiger.x > wallX + TS, `${key.padEnd(8)} the tiger smashes through it (reached ${S.tiger.x.toFixed(0)})`);
+}
+
+// ---- 4. bug reports -------------------------------------------------------
 console.log('\nbug report');
 S.mode = 'play'; S.li = 1; S.loadLevel(1);
 S.openReport();
@@ -162,7 +199,7 @@ check(title.length <= 72, `a long report still gets a short title (${title.lengt
 S.closeReport();
 check(S.reporting === false, 'Esc/Cancel resumes the game');
 
-// ---- 4. sound -------------------------------------------------------------
+// ---- 5. sound -------------------------------------------------------------
 console.log('\nsound');
 const runSeconds = sec => { for (let i = 0; i < sec * 60; i++) { clock += 1 / 60; S.pumpMusic(); } };
 notes.length = 0;
