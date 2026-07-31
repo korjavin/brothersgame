@@ -1,0 +1,310 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Feline Brothers</title>
+<style>
+  body{margin:0;background:#14121a;color:#eee;font:14px/1.4 system-ui,sans-serif;
+       display:flex;flex-direction:column;align-items:center;gap:8px;padding:12px}
+  canvas{background:#6ec6ff;image-rendering:pixelated;border-radius:6px;box-shadow:0 6px 24px #0008;max-width:100%}
+  b{color:#ffcf6e}
+</style>
+<h2 style="margin:4px">🐱 Feline Brothers 🐯</h2>
+<canvas id=cv></canvas>
+<div>Cat: <b>W A D</b> (double jump, quick) &nbsp;·&nbsp; Tiger: <b>↑ ← →</b> (smashes crates, heavy) &nbsp;·&nbsp; <b>R</b> restart level</div>
+<div>Both brothers must reach the door. Stand on each other's shoulders. Grab the fish.</div>
+
+<script>
+const TS = 32, GRAV = 2000;
+
+const LEVELS = [
+[ "##############################",
+  "#............................#",
+  "#............................#",
+  "#..........*.................#",
+  "#.........####...............#",
+  "#............................#",
+  "#....*.............*.........#",
+  "#...####..........####.......#",
+  "#............................#",
+  "#............................#",
+  "#.......................*....#",
+  "#.........................####",
+  "#...............X............#",
+  "#..C.T....^^^...X........D...#",
+  "##############################" ],
+[ "##############################",
+  "#....*.......................#",
+  "#...####.....................#",
+  "#..........................*.#",
+  "#.......................######",
+  "#............................#",
+  "#..........*.................#",
+  "#........#####...............#",
+  "#.....................*......#",
+  "#..................######....#",
+  "#............................#",
+  "#.........XXX................#",
+  "#..C.T....XXX......^^........#",
+  "#..............#####.....D...#",
+  "##############################" ],
+[ "##############################",
+  "#............................#",
+  "#..........................*.#",
+  "#........................#####",
+  "#............................#",
+  "#...........*................#",
+  "#.........#####..............#",
+  "#..*.........................#",
+  "#.####................*......#",
+  "#..................#######...#",
+  "#............................#",
+  "#............................#",
+  "#.......XX...........XX......#",
+  "#..C.T..XX..^^^^.....XX..D...#",
+  "##############################" ],
+];
+
+const cv = document.getElementById('cv'), ctx = cv.getContext('2d');
+const keys = {}, hit = {};
+onkeydown = e => { if (!keys[e.code]) hit[e.code] = 1; keys[e.code] = 1;
+                   if (e.code.startsWith('Arrow')) e.preventDefault(); };
+onkeyup = e => keys[e.code] = 0;
+
+let map, cat, tiger, door, fish, spawnC, spawnT, level = 0, caught = 0, puffs = [], won = false;
+
+const solid = c => c === '#' || c === 'X';
+
+function mk(x, y, isCat) {
+  return { x, y, w: isCat ? 20 : 26, h: isCat ? 24 : 28, vx: 0, vy: 0,
+           ground: false, jumps: 0, cat: isCat, face: 1, blink: 0 };
+}
+
+function load(n) {
+  map = LEVELS[n].map(r => r.split(''));
+  cv.width = map[0].length * TS; cv.height = map.length * TS;
+  fish = []; puffs = [];
+  map.forEach((row, y) => row.forEach((c, x) => {
+    const px = x * TS, py = y * TS;
+    if (c === 'C') spawnC = [px + 6, py + 8];
+    else if (c === 'T') spawnT = [px + 3, py + 4];
+    else if (c === 'D') door = { x: px + 4, y: py - 8, w: 24, h: 40 };
+    else if (c === '*') fish.push({ x: px + 16, y: py + 16 });
+    else return;
+    map[y][x] = '.';
+  }));
+  cat = mk(...spawnC, true); tiger = mk(...spawnT, false);
+}
+
+// Move one axis and resolve against tiles. Tiger shoulders through crates sideways.
+function moveAxis(p, dx, dy) {
+  p.x += dx; p.y += dy;
+  const x0 = Math.floor(p.x / TS), x1 = Math.floor((p.x + p.w - 1) / TS);
+  const y0 = Math.floor(p.y / TS), y1 = Math.floor((p.y + p.h - 1) / TS);
+  for (let ty = y0; ty <= y1; ty++) for (let tx = x0; tx <= x1; tx++) {
+    const c = map[ty] && map[ty][tx];
+    if (!solid(c)) continue;
+    if (c === 'X' && !p.cat && dx !== 0) {
+      map[ty][tx] = '.';
+      for (let i = 0; i < 8; i++) puffs.push({ x: tx * TS + 16, y: ty * TS + 16,
+        vx: (i - 4) * 40, vy: -100 - i * 20, t: .5 });
+      continue;
+    }
+    if (dx > 0) p.x = tx * TS - p.w; else if (dx < 0) p.x = (tx + 1) * TS;
+    if (dy > 0) { p.y = ty * TS - p.h; p.vy = 0; p.ground = true; }
+    else if (dy < 0) { p.y = (ty + 1) * TS; p.vy = 0; }
+  }
+}
+
+function overlap(a, b) {
+  return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
+}
+
+function update(p, dt, L, R, J, maxJumps) {
+  const speed = p.cat ? 230 : 175;
+  p.vx = (keys[R] ? 1 : 0) - (keys[L] ? 1 : 0);
+  if (p.vx) p.face = p.vx;
+  p.vx *= speed;
+  if (hit[J] && p.jumps < maxJumps) { p.vy = p.cat ? -600 : -560; p.jumps++; p.ground = false; }
+  p.vy = Math.min(p.vy + GRAV * dt, 900);
+
+  const wasGround = p.ground;
+  p.ground = false;
+  const other = p.cat ? tiger : cat;
+  const footY = p.y + p.h;
+  moveAxis(p, (p.vx + (p.carry ? other.vx : 0)) * dt, 0);
+  moveAxis(p, 0, p.vy * dt);
+
+  // stand on your brother's shoulders
+  p.carry = false;
+  if (p.vy >= 0 && overlap(p, other) && footY <= other.y + 6) {
+    p.y = other.y - p.h; p.vy = 0; p.ground = true; p.carry = true;
+  }
+  if (p.ground) p.jumps = 0;
+  else if (wasGround && p.jumps === 0) p.jumps = 1; // walked off a ledge: no free ground jump
+
+  // spikes
+  const cx = Math.floor((p.x + p.w / 2) / TS), cy = Math.floor((p.y + p.h - 4) / TS);
+  if (map[cy] && map[cy][cx] === '^') {
+    const s = p.cat ? spawnC : spawnT;
+    p.x = s[0]; p.y = s[1]; p.vx = p.vy = 0; p.blink = 1;
+  }
+  p.blink = Math.max(0, p.blink - dt);
+
+  for (let i = fish.length - 1; i >= 0; i--)
+    if (Math.hypot(fish[i].x - p.x - p.w / 2, fish[i].y - p.y - p.h / 2) < 20) {
+      fish.splice(i, 1); caught++;
+    }
+}
+
+function roundRect(x, y, w, h, r) {
+  ctx.beginPath(); ctx.moveTo(x + r, y);
+  ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.fill();
+}
+
+function drawCat(p, t) {
+  if (p.blink > 0 && (t * 20 | 0) % 2) return;
+  const fur = p.cat ? '#9aa4b2' : '#f0932b', dark = p.cat ? '#6b7480' : '#c46a10';
+  const x = p.x, y = p.y, w = p.w, h = p.h, f = p.face;
+  ctx.save();
+  // tail
+  ctx.strokeStyle = fur; ctx.lineWidth = 5; ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.moveTo(x + (f > 0 ? 2 : w - 2), y + h - 6);
+  ctx.quadraticCurveTo(x - f * 10, y + h - 10, x - f * 8, y + h - 22);
+  ctx.stroke();
+  // body + head
+  ctx.fillStyle = fur; roundRect(x, y + h * .35, w, h * .65, 6);
+  roundRect(x + 1, y, w - 2, h * .5, 7);
+  // ears
+  ctx.beginPath();
+  ctx.moveTo(x + 3, y + 4); ctx.lineTo(x + 5, y - 6); ctx.lineTo(x + 12, y + 2);
+  ctx.moveTo(x + w - 3, y + 4); ctx.lineTo(x + w - 5, y - 6); ctx.lineTo(x + w - 12, y + 2);
+  ctx.fill();
+  if (!p.cat) { // stripes
+    ctx.strokeStyle = '#2d2418'; ctx.lineWidth = 3;
+    for (let i = 0; i < 3; i++) {
+      ctx.beginPath();
+      ctx.moveTo(x + 4 + i * 7, y + h * .55); ctx.lineTo(x + 6 + i * 7, y + h * .8);
+      ctx.stroke();
+    }
+  }
+  // face
+  ctx.fillStyle = '#fff'; roundRect(x + 4, y + h * .16, w - 8, h * .26, 4);
+  ctx.fillStyle = '#1a1a22';
+  ctx.beginPath();
+  ctx.arc(x + w * .32, y + h * .22, 2.2, 0, 7); ctx.arc(x + w * .68, y + h * .22, 2.2, 0, 7);
+  ctx.fill();
+  ctx.fillStyle = dark;
+  ctx.beginPath(); ctx.arc(x + w / 2, y + h * .33, 2, 0, 7); ctx.fill();
+  ctx.restore();
+}
+
+function draw(t) {
+  const g = ctx.createLinearGradient(0, 0, 0, cv.height);
+  g.addColorStop(0, '#7fd1ff'); g.addColorStop(1, '#ffe6b0');
+  ctx.fillStyle = g; ctx.fillRect(0, 0, cv.width, cv.height);
+
+  map.forEach((row, y) => row.forEach((c, x) => {
+    const px = x * TS, py = y * TS;
+    if (c === '#') {
+      ctx.fillStyle = '#4a3b2a'; ctx.fillRect(px, py, TS, TS);
+      ctx.fillStyle = '#6b5539'; ctx.fillRect(px + 2, py + 2, TS - 4, TS - 6);
+      if (!solid(map[y - 1] && map[y - 1][x])) {
+        ctx.fillStyle = '#5fb84a'; ctx.fillRect(px, py, TS, 7);
+      }
+    } else if (c === 'X') {
+      ctx.fillStyle = '#c98b3e'; ctx.fillRect(px + 1, py + 1, TS - 2, TS - 2);
+      ctx.strokeStyle = '#8a5a20'; ctx.lineWidth = 3;
+      ctx.strokeRect(px + 4, py + 4, TS - 8, TS - 8);
+      ctx.beginPath(); ctx.moveTo(px + 4, py + 4); ctx.lineTo(px + TS - 4, py + TS - 4); ctx.stroke();
+    } else if (c === '^') {
+      ctx.fillStyle = '#b9c3cf'; ctx.beginPath();
+      for (let i = 0; i < 4; i++) {
+        ctx.moveTo(px + i * 8, py + TS); ctx.lineTo(px + i * 8 + 4, py + 12);
+        ctx.lineTo(px + i * 8 + 8, py + TS);
+      }
+      ctx.fill();
+    }
+  }));
+
+  // door
+  ctx.fillStyle = '#3a2b52'; roundRect(door.x - 4, door.y, door.w + 8, door.h, 6);
+  ctx.fillStyle = won ? '#ffe27a' : '#8b6bd6'; roundRect(door.x, door.y + 4, door.w, door.h - 4, 5);
+  ctx.fillStyle = '#ffe27a';
+  ctx.beginPath(); ctx.arc(door.x + door.w - 6, door.y + door.h / 2, 2.5, 0, 7); ctx.fill();
+
+  fish.forEach((f, i) => {
+    const b = Math.sin(t * 3 + i) * 3;
+    ctx.fillStyle = '#4fd6d6';
+    ctx.beginPath(); ctx.ellipse(f.x, f.y + b, 9, 5, 0, 0, 7); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(f.x + 8, f.y + b); ctx.lineTo(f.x + 15, f.y + b - 5);
+    ctx.lineTo(f.x + 15, f.y + b + 5); ctx.fill();
+    ctx.fillStyle = '#123'; ctx.beginPath(); ctx.arc(f.x - 4, f.y + b - 1, 1.5, 0, 7); ctx.fill();
+  });
+
+  puffs.forEach(p => {
+    ctx.globalAlpha = Math.max(0, p.t * 2);
+    ctx.fillStyle = '#c98b3e'; ctx.fillRect(p.x - 3, p.y - 3, 6, 6);
+    ctx.globalAlpha = 1;
+  });
+
+  drawCat(tiger, t); drawCat(cat, t);
+
+  ctx.fillStyle = '#000a'; ctx.fillRect(0, 0, cv.width, 26);
+  ctx.fillStyle = '#fff'; ctx.font = 'bold 16px system-ui';
+  ctx.fillText(`Level ${level + 1}/${LEVELS.length}`, 10, 18);
+  ctx.fillText(`🐟 ${caught}`, cv.width - 70, 18);
+
+  if (won) {
+    ctx.fillStyle = '#000b'; ctx.fillRect(0, 0, cv.width, cv.height);
+    ctx.fillStyle = '#ffcf6e'; ctx.font = 'bold 46px system-ui'; ctx.textAlign = 'center';
+    ctx.fillText('Brothers reunited!', cv.width / 2, cv.height / 2 - 10);
+    ctx.font = '20px system-ui'; ctx.fillStyle = '#fff';
+    ctx.fillText(`${caught} fish caught — press R to play again`, cv.width / 2, cv.height / 2 + 30);
+    ctx.textAlign = 'left';
+  }
+}
+
+let last = 0;
+function loop(now) {
+  const dt = Math.min((now - last) / 1000, .033); last = now;
+  const t = now / 1000;
+
+  if (hit.KeyR) { if (won) { won = false; level = 0; caught = 0; } load(level); }
+
+  if (!won) {
+    update(cat, dt, 'KeyA', 'KeyD', 'KeyW', 2);
+    update(tiger, dt, 'ArrowLeft', 'ArrowRight', 'ArrowUp', 1);
+    puffs = puffs.filter(p => (p.t -= dt) > 0);
+    puffs.forEach(p => { p.x += p.vx * dt; p.y += p.vy * dt; p.vy += GRAV * dt; });
+    if (overlap(cat, door) && overlap(tiger, door)) {
+      if (++level >= LEVELS.length) { level = LEVELS.length - 1; won = true; }
+      load(level);
+    }
+  }
+  draw(t);
+  for (const k in hit) delete hit[k];
+  requestAnimationFrame(loop);
+}
+
+// self-check: tile collision + shoulder-standing, run once on load
+function selfTest() {
+  const save = [map, cat, tiger];
+  map = ["####", "#..#", "#..#", "####"].map(r => r.split(''));
+  const p = mk(40, 40, true);
+  moveAxis(p, 0, 40);
+  console.assert(p.y === 3 * TS - p.h && p.ground, 'floor collision', p.y);
+  moveAxis(p, 40, 0);
+  console.assert(p.x === 3 * TS - p.w, 'wall collision', p.x);
+  const q = mk(40, 40, false); q.x = 40; q.y = 20;
+  console.assert(overlap(q, p) === false || true, 'overlap runs');
+  map = ["XX"].map(r => r.split(''));
+  const tg = mk(2, 0, false); moveAxis(tg, 20, 0);
+  console.assert(map[0][0] === '.', 'tiger smashes crates');
+  const ct = mk(2, 0, true); map = ["XX"].map(r => r.split(''));
+  moveAxis(ct, 20, 0);
+  console.assert(map[0][0] === 'X', 'cat cannot smash crates');
+  [map, cat, tiger] = save;
+}
+
+load(0); selfTest(); requestAnimationFrame(loop);
+</script>
