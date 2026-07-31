@@ -1,0 +1,7 @@
+{
+  "database": "dolt",
+  "backend": "dolt",
+  "dolt_mode": "embedded",
+  "dolt_database": "brothersgame",
+  "project_id": "c419a8a8-886b-44fd-a343-28bc8c792b73"
+}
