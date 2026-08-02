@@ -23,6 +23,11 @@ Put the halves together and they grant the heart's desire, so: six times through
 
 Each era opens with a card: what the place is, and one true thing about it or about Nesbit.
 
+Five of the six eras end with a boss standing in front of the arch — the Rag-and-Bone Man, the
+Great Crocodile of the Nile, the Captain of the Queen's Guard, the Last Priest of Atlantis, the
+Centurion. Land on his head three to five times; the arch stays shut until he goes down. The
+bright city has none, which is rather the point of it.
+
 ## Controls
 
 | | Cat | Tiger |

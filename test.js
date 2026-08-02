@@ -46,7 +46,7 @@ vm.runInContext(src + `
   get mode(){return mode}, set mode(v){mode=v}, get li(){return li}, set li(v){li=v},
   get hearts(){return hearts}, set hearts(v){hearts=v}, get score(){return score},
   get cat(){return cat}, get tiger(){return tiger}, get foes(){return foes}, get tokens(){return tokens},
-  get map(){return map}, get doorway(){return doorway}, get water(){return water},
+  get map(){return map}, get doorway(){return doorway}, get water(){return water}, get boss(){return boss},
   openReport, closeReport, refreshLink, whereAmI, get sendLink(){return sendLink}, get bugtext(){return bugtext},
   get reporting(){return reporting},
   get W(){return W}, get H(){return H} };`, sandbox);
@@ -174,7 +174,47 @@ for (const [i, key, col] of [[0, 'london', 22], [1, 'egypt', 45], [2, 'babylon',
   check(S.tiger.x > wallX + TS, `${key.padEnd(8)} the tiger smashes through it (reached ${S.tiger.x.toFixed(0)})`);
 }
 
-// ---- 4. bug reports -------------------------------------------------------
+// ---- 4. the boss holds the arch shut -------------------------------------
+console.log('\nbosses');
+const atDoor = () => {
+  S.cam.x = Math.max(0, S.doorway.x - 500);
+  S.cat.x = S.doorway.x + 4; S.cat.y = S.doorway.y + 8; S.cat.inv = 99;
+  S.tiger.x = S.doorway.x + 6; S.tiger.y = S.doorway.y + 8; S.tiger.inv = 99;
+};
+for (let i = 0; i < 5; i++) {
+  S.mode = 'play'; S.li = i; S.loadLevel(i); S.hearts = 3;
+  const era = S.ERAS[i], b = S.boss;
+  if (!b) { check(false, `${era.key}: no boss spawned`); continue; }
+
+  const floorY = b.y;                                  // he must not walk off his ledge
+  S.cat.x = 0; S.tiger.x = 0;                          // brothers far to the left, so he charges
+  for (let f = 0; f < 60 * 12; f++) S.step(1 / 60);
+  const stayed = S.boss.y < S.H * TS && Math.abs(S.boss.y - floorY) < 200;
+
+  atDoor(); tick(2);
+  const shut = S.li === i;
+
+  for (let n = 0; n < b.maxhp; n++) {                   // stomp him out
+    S.boss.inv = 0;                                    // both brothers, or the camera clamp
+    S.cat.x = S.boss.x; S.cat.y = S.boss.y - S.cat.h; S.cat.vy = 300;   // drags the cat off him
+    S.tiger.x = S.boss.x; S.tiger.y = S.boss.y - 90; S.tiger.inv = 99;
+    S.cam.x = Math.max(0, S.boss.x - 400);
+    tick(1);
+  }
+  const dead = S.boss.hp === 0;
+
+  atDoor(); tick(2);
+  const opened = S.li === i + 1;
+
+  check(shut && dead && opened && stayed,
+    `${era.key.padEnd(8)} ${b.name}: ${b.maxhp} stomps, arch shut${shut ? '' : ' NOT'} until he falls` +
+    `${stayed ? '' : ' (BUT he left his ledge)'}${dead ? '' : ' (BUT he survived)'}` +
+    `${opened ? '' : ' (BUT the arch stayed shut)'}`);
+}
+S.mode = 'play'; S.li = 5; S.loadLevel(5);
+check(S.boss === null, 'the future has no boss — nothing left to fight there');
+
+// ---- 5. bug reports -------------------------------------------------------
 console.log('\nbug report');
 S.mode = 'play'; S.li = 1; S.loadLevel(1);
 S.openReport();
@@ -199,7 +239,7 @@ check(title.length <= 72, `a long report still gets a short title (${title.lengt
 S.closeReport();
 check(S.reporting === false, 'Esc/Cancel resumes the game');
 
-// ---- 5. sound -------------------------------------------------------------
+// ---- 6. sound -------------------------------------------------------------
 console.log('\nsound');
 const runSeconds = sec => { for (let i = 0; i < sec * 60; i++) { clock += 1 / 60; S.pumpMusic(); } };
 notes.length = 0;
