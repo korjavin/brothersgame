@@ -53,7 +53,7 @@ Maps are run-specs, not ASCII art, so columns line up by construction:
 ```
 
 `#` ground · `X` crate (tiger only) · `=` plank (jump up through) · `^` spikes · `*` shard ·
-`E` enemy · `P` checkpoint · `C`/`T` spawns · `D` arch.
+`E` enemy · `B` boss · `P` checkpoint · `C`/`T` spawns · `D` arch.
 
 Open the console to see the collision self-check run on load.
 
@@ -76,7 +76,8 @@ node test.js
 
 No dependencies — it fakes a canvas and Web Audio, then runs the real game: a bot walks all six
 levels to their arch, Atlantis's climb is proved reachable ledge by ledge, the sequencer is checked
-for tempo and mute, and the bug-report link is checked for shape and length. Run it after editing a
+for tempo and mute, every boss is stomped down and the arch proved shut until he falls, and
+the bug-report link is checked for shape and length. Run it after editing a
 level; that is what catches an unjumpable gap.
 
 MIT.
