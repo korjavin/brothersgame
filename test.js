@@ -80,6 +80,13 @@ const foe2 = S.foes[1];
 S.tiger.x = foe2.x - 2; S.tiger.y = foe2.y; S.tiger.vy = 0; S.tiger.inv = 0; tick(2);
 check(S.hearts === 2, 'walking into a foe costs a heart');
 
+// github#2: the pips over an airborne brother's head read maxJumps - jumps
+S.loadLevel(0); tick(40);
+S.hit.KeyW = 1; tick(2);
+check(S.cat.maxJumps - S.cat.jumps === 1, `the cat shows one jump left after his first (${S.cat.maxJumps - S.cat.jumps})`);
+S.tiger.ground = false; S.tiger.jumps = 1; S.tiger.y -= 40; tick(1);
+check(S.tiger.maxJumps - S.tiger.jumps === 0, 'a tiger who walked off a ledge shows no jump left');
+
 S.loadLevel(0);
 const bro = S.tiger;
 S.cat.x = bro.x; S.cat.y = bro.y - 60; S.cat.vy = 400; tick(6);

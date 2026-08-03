@@ -32,7 +32,12 @@
 <div class=keys>
   <span>🐱 <b>A D</b> move · <b>W</b> jump ×2 · <b>S</b> drop</span>
   <span>🐯 <b>← →</b> move · <b>↑</b> jump · <b>↓</b> drop</span>
-  <span><b>Q</b> Psammead's wish · <b>R</b> restart · <b>Enter</b> continue · <b>M</b> mute</span>
+  <span><b>R</b> restart · <b>Enter</b> continue · <b>M</b> mute</span>
+</div>
+<div class=keys>
+  <span><b>Q</b> — the Psammead grants <b>one wish per level</b>: for 8 seconds each brother gets the
+  other's talent — the cat can smash crates, the tiger jumps twice. The yellow pips over a brother's
+  head in mid-air are the jumps he has left.</span>
   <span><button id=bugbtn>🐞 Report a bug (B)</button></span>
 </div>
 
@@ -442,7 +447,7 @@ function updatePlayer(p, dt, L, Rk, J, Dn, baseJumps) {
   const fast = p.cat || wishT > 0;
   p.vx = ((keys[Rk] ? 1 : 0) - (keys[L] ? 1 : 0)) * (p.cat ? 235 : 195);
   if (p.vx) { p.face = Math.sign(p.vx); p.step += dt * 9; }
-  const maxJumps = baseJumps + (wishT > 0 && !p.cat ? 1 : 0);
+  const maxJumps = p.maxJumps = baseJumps + (wishT > 0 && !p.cat ? 1 : 0);
   if (hit[J] && p.jumps < maxJumps) { p.vy = p.cat ? -600 : -580; p.jumps++; p.ground = false; sfx.jump(p.cat); }
   if (keys[J] && p.vy < -180) p.vy += g * dt * -0.35;    // hold for a higher hop
   p.vy = Math.min(p.vy + g * dt, 950);
@@ -615,7 +620,7 @@ function drawTiles() {
       ctx.fillStyle = top; ctx.fillRect(px, py, TS, 8);
       ctx.fillStyle = dark; ctx.fillRect(px, py + 8, TS, 3);
     } else if (c === '^') {
-      ctx.fillStyle = '#cfd8e2'; ctx.beginPath();
+      ctx.fillStyle = '#8e1f2b'; ctx.beginPath();
       for (let i = 0; i < 4; i++) {
         ctx.moveTo(px + i * 8, py + TS); ctx.lineTo(px + i * 8 + 4, py + 11); ctx.lineTo(px + i * 8 + 8, py + TS);
       }
@@ -653,6 +658,12 @@ function drawFeline(p) {
   ctx.fillStyle = '#1a1a22'; ctx.beginPath();
   ctx.arc(x + w * .32, y + h * .22, 2.3, 0, 7); ctx.arc(x + w * .68, y + h * .22, 2.3, 0, 7); ctx.fill();
   ctx.fillStyle = dark; ctx.beginPath(); ctx.arc(x + w / 2, y + h * .33, 2, 0, 7); ctx.fill();
+  if (!p.ground) {                    // github#2: in the air you cannot tell what you have left
+    for (let i = 0; i < p.maxJumps; i++) {
+      ctx.fillStyle = i < p.maxJumps - p.jumps ? '#ffe27a' : '#00000044';
+      ctx.fillRect(x + w / 2 - p.maxJumps * 4 + i * 8, y - 16, 6, 4);
+    }
+  }
   if (wishT > 0) {                                     // wish sparkle
     ctx.fillStyle = '#ffe27a';
     for (let i = 0; i < 3; i++) {
@@ -771,7 +782,8 @@ function hud() {
     ctx.textAlign = 'left';
   }
   ctx.fillStyle = wishT > 0 ? '#ffe27a' : wish ? '#a8ffcf' : '#ffffff30';
-  ctx.fillText(wishT > 0 ? `WISH ${wishT.toFixed(1)}s` : wish ? 'Q — one wish left' : 'wish spent', 700, 20);
+  ctx.fillText(wishT > 0 ? `WISH — swapped talents, ${wishT.toFixed(1)}s`
+             : wish ? 'Q — wish: swap talents for 8s' : 'wish spent', 660, 20);
 }
 
 function card(title, sub, body, foot, accent) {
@@ -832,7 +844,7 @@ function render() {
     ctx.fillStyle = '#12101c'; ctx.fillRect(0, 0, VW, VH);
     card('Feline Brothers', 'after The Story of the Amulet — E. Nesbit, 1906',
       'A cat and a tiger, brothers, buy half a red amulet in a London junk shop. A very rude sand-fairy explains that the other half was lost four thousand years ago — and that the two halves, put together, grant the heart\'s desire. Six times through the arch: Egypt, Babylon, Atlantis on its last morning, Caesar\'s camp, and a city a long way ahead.',
-      'The cat jumps twice and runs fast. The tiger shoulders through anything. Neither gets through a door without the other.');
+      'The cat jumps twice and runs fast. The tiger shoulders through anything. Neither gets through a door without the other. Press Q once a level and the Psammead swaps their talents for eight seconds — the cat smashes, the tiger jumps twice.');
     return;
   }
 

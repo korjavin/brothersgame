@@ -37,7 +37,9 @@ bright city has none, which is rather the point of it.
 | drop through a plank | `S` | `↓` |
 
 `Q` — the Psammead grants **one wish per level**: for 8 seconds each brother gets the other's
-talent (the cat can shoulder through crates, the tiger gets a second jump).
+talent (the cat can shoulder through crates, the tiger gets a second jump). The yellow pips over a
+brother's head while he is in the air are the jumps he has left — one for the tiger, two for the
+cat, and none once he has walked off a ledge.
 `R` restarts the level · `Enter` turns a story card.
 
 Neither brother gets through an arch without the other. The cat is fast and jumps twice; the
