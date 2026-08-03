@@ -87,11 +87,13 @@ check(S.tiger.maxJumps - S.tiger.jumps === 1, `the tiger stands with his one jum
 S.hit.KeyW = 1; tick(2);
 check(S.cat.maxJumps - S.cat.jumps === 1, `the cat shows one jump left after his first (${S.cat.maxJumps - S.cat.jumps})`);
 S.loadLevel(0); tick(40);             // london's ground has a pit at columns 15-17
-S.tiger.x = 16 * TS; tick(1);         // he has just stepped out over it
+S.tiger.x = 16 * TS; tick(12);        // he stepped out over it a fifth of a second ago
 check(!S.tiger.ground && S.tiger.maxJumps - S.tiger.jumps === 1,
-      'the tiger keeps his jump the instant he leaves a ledge (coyote time)');
-tick(12);                             // 0.2s, past the 0.12s window
-check(S.tiger.maxJumps - S.tiger.jumps === 0, 'and loses it once the coyote window closes');
+      'a tiger falling off a ledge still has his jump — green means he can jump');
+const fell = S.tiger.y;
+S.hit.ArrowUp = 1; tick(2);
+check(S.tiger.y < fell && S.tiger.maxJumps - S.tiger.jumps === 0,
+      'and taking it launches him and turns the slot red');
 
 S.loadLevel(0);
 const bro = S.tiger;
