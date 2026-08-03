@@ -348,7 +348,7 @@ const isWall = c => c === '#' || c === 'X';
 
 function mkPlayer(x, y, isCat) {
   return { x, y, w: isCat ? 20 : 26, h: isCat ? 24 : 28, vx: 0, vy: 0, ground: false,
-           jumps: 0, maxJumps: isCat ? 2 : 1, cat: isCat, face: 1, inv: 0, step: 0 };
+           jumps: 0, maxJumps: isCat ? 2 : 1, coyote: 0, cat: isCat, face: 1, inv: 0, step: 0 };
 }
 
 function loadLevel(n) {
@@ -465,8 +465,10 @@ function updatePlayer(p, dt, L, Rk, J, Dn, baseJumps) {
   if (p.vy >= 0 && overlap(p, perch) && footY <= bro.y + 8) {
     p.y = bro.y - p.h; p.vy = 0; p.ground = true; p.riding = true;
   }
-  if (p.ground) p.jumps = 0;
-  else if (wasGround && p.jumps === 0) p.jumps = 1;     // no free jump after walking off
+  // Stepping off a ledge has to cost the ground jump, else falling is a free extra jump — but
+  // taking it the same frame is unfair, so there is a coyote window to still push off.
+  if (p.ground) { p.jumps = 0; p.coyote = .12; }
+  else if ((p.coyote = Math.max(0, p.coyote - dt)) <= 0 && p.jumps === 0) p.jumps = 1;
 
   // hazards
   const cx = Math.floor((p.x + p.w / 2) / TS), cy = Math.floor((p.y + p.h - 4) / TS);

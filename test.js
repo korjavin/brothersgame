@@ -86,8 +86,12 @@ check(S.cat.maxJumps - S.cat.jumps === 2, `the cat stands with both jumps lit ($
 check(S.tiger.maxJumps - S.tiger.jumps === 1, `the tiger stands with his one jump lit (${S.tiger.maxJumps - S.tiger.jumps})`);
 S.hit.KeyW = 1; tick(2);
 check(S.cat.maxJumps - S.cat.jumps === 1, `the cat shows one jump left after his first (${S.cat.maxJumps - S.cat.jumps})`);
-S.tiger.ground = false; S.tiger.jumps = 1; S.tiger.y -= 40; tick(1);
-check(S.tiger.maxJumps - S.tiger.jumps === 0, 'a tiger who walked off a ledge shows no jump left');
+S.loadLevel(0); tick(40);             // london's ground has a pit at columns 15-17
+S.tiger.x = 16 * TS; tick(1);         // he has just stepped out over it
+check(!S.tiger.ground && S.tiger.maxJumps - S.tiger.jumps === 1,
+      'the tiger keeps his jump the instant he leaves a ledge (coyote time)');
+tick(12);                             // 0.2s, past the 0.12s window
+check(S.tiger.maxJumps - S.tiger.jumps === 0, 'and loses it once the coyote window closes');
 
 S.loadLevel(0);
 const bro = S.tiger;

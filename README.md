@@ -40,8 +40,11 @@ bright city has none, which is rather the point of it.
 talent (the cat can shoulder through crates, the tiger gets a second jump).
 
 A black bar over each brother's head shows his jumps: green = still available, red = spent. One
-slot for the tiger, two for the cat, three under a wish. Standing still they are all green; a tiger
-who walked off a ledge goes red, because stepping off costs the ground jump.
+slot for the tiger, two for the cat, three under a wish.
+
+Walking off a ledge costs the ground jump — otherwise falling would hand you a free extra one — but
+there is a **0.12s coyote window** where you can still push off, so stepping a pixel too far is not
+punished. The bar goes red the moment that window closes.
 `R` restarts the level · `Enter` turns a story card.
 
 Neither brother gets through an arch without the other. The cat is fast and jumps twice; the
