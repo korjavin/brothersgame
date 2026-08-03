@@ -48,7 +48,7 @@ vm.runInContext(src + `
   get hearts(){return hearts}, set hearts(v){hearts=v}, get score(){return score},
   get cat(){return cat}, get tiger(){return tiger}, get foes(){return foes}, get tokens(){return tokens},
   get map(){return map}, get doorway(){return doorway}, get water(){return water}, get boss(){return boss},
-  openReport, closeReport, refreshLink, whereAmI, togglePause, get paused(){return paused}, get sendLink(){return sendLink}, get bugtext(){return bugtext},
+  openReport, closeReport, refreshLink, whereAmI, togglePause, get paused(){return paused}, auto, get sendLink(){return sendLink}, get bugtext(){return bugtext},
   get reporting(){return reporting},
   get W(){return W}, get H(){return H} };`, sandbox);
 
@@ -289,7 +289,48 @@ runSeconds(1);
 ok(notes.length - resumed < 60, 'unmute dumped a backlog of notes');
 console.log('  ok mute is silent, unmute resumes cleanly');
 
-// ---- 7. pause -------------------------------------------------------------
+// ---- 7. autopilot ---------------------------------------------------------
+console.log('\nautopilot');
+S.mode = 'play'; S.li = 0; S.loadLevel(0); S.hearts = 3; tick(30);
+S.auto.cat = S.auto.tiger = false;
+S.hit.Digit2 = 1; tick();
+check(S.auto.tiger === true, '2 toggles the tiger onto autopilot');
+
+S.cat.x = S.tiger.x + 300;            // the cat has walked off; the tiger should come along
+const far = Math.abs(S.cat.x - S.tiger.x);
+tick(120);
+const near = Math.abs(S.cat.x - S.tiger.x);
+check(near < far && near < 90, `the tiger follows his brother (gap ${far.toFixed(0)} -> ${near.toFixed(0)})`);
+check(S.tiger.bot !== null, 'and he is running on bot input');
+
+S.keys.ArrowLeft = 1;                 // the player cuts in
+const wasAt = S.tiger.x;
+tick(20);
+check(S.tiger.bot === null && S.tiger.x < wasAt,
+      'a key press takes the tiger back off the bot mid-mode');
+S.keys.ArrowLeft = 0; tick(20);
+check(S.tiger.bot !== null, 'and letting go hands him back to the bot');
+
+// drive only the cat across london: the tiger has to keep up over the pit at columns 15-17,
+// and stops at the crate barrier (704) — smashing it is where the player takes him back.
+S.mode = 'play'; S.li = 0; S.loadLevel(0); S.hearts = 3; S.auto.tiger = true;
+for (let f = 0; f < 60 * 30; f++) {
+  botStep(S.cat, 'KeyA', 'KeyD', 'KeyW');
+  S.step(1 / 60); S.hearts = 3;
+  for (const k in S.hit) delete S.hit[k];
+}
+S.keys.KeyD = S.keys.KeyW = 0;
+check(S.tiger.x > 600 && Math.abs(S.cat.x - S.tiger.x) < 120,
+      `the tiger followed over the pit and is still at his brother's side (tiger ${S.tiger.x.toFixed(0)}, gap ${Math.abs(S.cat.x - S.tiger.x).toFixed(0)})`);
+check(S.tiger.y < 13 * TS, 'and he did not end up down a hole');
+
+S.mode = 'play'; S.li = 1; S.loadLevel(1); tick(5);
+check(S.auto.tiger === true && S.tiger.bot !== null, 'autopilot survives a change of era');
+S.hit.Digit2 = 1; tick();
+check(S.auto.tiger === false && S.tiger.bot === null, '2 again switches it off');
+S.auto.cat = S.auto.tiger = false;
+
+// ---- 8. pause -------------------------------------------------------------
 console.log('\npause');
 S.mode = 'play'; S.li = 0; S.loadLevel(0); S.hearts = 3; tick(20);
 const restX = S.cat.x, restT = S.tiger.x;

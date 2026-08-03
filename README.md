@@ -44,6 +44,15 @@ for the tiger, two for the cat, three under a wish. Walking off a ledge does not
 jump is yours until you use it, and the slot goes red only when you do.
 `P` pauses — the music stops with it · `R` restarts the level · `Enter` turns a story card.
 
+## Playing on your own
+
+`1` puts the cat on autopilot, `2` the tiger. The autopilot walks a step or two behind his brother
+and jumps when he does — nothing clever, just company. **Touch any of that brother's keys and you
+have him back for as long as you hold them**, then the bot picks up again; the mode stays on.
+
+That is the whole design: the bot handles the walking, you step in for the moments that need him —
+smashing a crate barrier with the tiger, or standing still to be climbed on.
+
 Neither brother gets through an arch without the other. The cat is fast and jumps twice; the
 tiger is slow and smashes crates. Either can stand on the other's shoulders — and gets carried.
 

@@ -32,7 +32,7 @@
 <div class=keys>
   <span>🐱 <b>A D</b> move · <b>W</b> jump ×2 · <b>S</b> drop</span>
   <span>🐯 <b>← →</b> move · <b>↑</b> jump · <b>↓</b> drop</span>
-  <span><b>P</b> pause · <b>R</b> restart · <b>Enter</b> continue · <b>M</b> mute</span>
+  <span><b>1</b>/<b>2</b> autopilot 🐱/🐯 · <b>P</b> pause · <b>R</b> restart · <b>Enter</b> continue · <b>M</b> mute</span>
 </div>
 <div class=keys>
   <span><b>Q</b> — the Psammead grants <b>one wish per level</b>: for 8 seconds each brother gets the
@@ -327,7 +327,8 @@ mask.width = VW; mask.height = VH;
 const mx = mask.getContext('2d');
 
 const keys = {}, hit = {};
-const HELD = ['KeyA','KeyD','KeyW','KeyS','ArrowLeft','ArrowRight','ArrowUp','ArrowDown','KeyQ','KeyR','KeyM','Enter','Space'];
+const HELD = ['KeyA','KeyD','KeyW','KeyS','ArrowLeft','ArrowRight','ArrowUp','ArrowDown',
+              'KeyQ','KeyR','KeyM','Digit1','Digit2','Enter','Space'];
 onkeydown = e => {
   if (reporting) {                                         // let the player type
     if (e.code === 'Escape') closeReport();
@@ -450,21 +451,45 @@ function smash(tx, ty) {
 
 const overlap = (a, b) => a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
 
+// Autopilot: walk a couple of steps from your brother and jump when he does. The player pressing
+// any of this brother's keys wins the frame, so he can always cut in without leaving the mode.
+const auto = { cat: false, tiger: false };          // outside the players, so it survives a level change
+const isAuto = p => auto[p.cat ? 'cat' : 'tiger'];
+
+function autopilot(p, L, Rk, J, Dn) {
+  if (!isAuto(p) || keys[L] || keys[Rk] || keys[J] || keys[Dn]) { p.bot = p.botHit = null; p.rush = 1; return; }
+  const bro = p.cat ? tiger : cat, K = p.bot = {}, H = p.botHit = {};
+  const dx = bro.x - p.x;
+  p.rush = Math.abs(dx) > 140 ? 1.5 : 1;            // else the slower brother never catches up
+  if (Math.abs(dx) > 56) K[dx > 0 ? Rk : L] = 1;    // 56/28 hysteresis, or he shuffles on the spot
+  else if (Math.abs(dx) < 28) K[dx > 0 ? L : Rk] = 1;
+
+  const solid = c => isWall(c) || c === '=';
+  const feet = Math.floor((p.y + p.h + 4) / TS);
+  const ahead = Math.floor((p.x + p.w / 2 + (K[Rk] ? 22 : -22)) / TS);
+  const blocked = !solid((map[feet] || [])[ahead]) || isWall((map[feet - 1] || [])[ahead]);
+  const higher = bro.y + bro.h < p.y - 12;
+  if (p.ground && (blocked || higher)) H[J] = K[J] = 1;
+  else if (!p.ground && p.vy < -120) K[J] = 1;      // hold for height, without re-triggering
+  else if (!p.ground && p.vy > 60 && higher && p.jumps < p.maxJumps) H[J] = K[J] = 1;
+}
+
 function updatePlayer(p, dt, L, Rk, J, Dn, baseJumps) {
   const g = era.gravity || GRAV;
-  const fast = p.cat || wishT > 0;
-  p.vx = ((keys[Rk] ? 1 : 0) - (keys[L] ? 1 : 0)) * (p.cat ? 235 : 195);
+  const K = p.bot || keys, KH = p.botHit || hit;        // the bot's input, or the player's
+                                                        // (not H — that is the map height)
+  p.vx = ((K[Rk] ? 1 : 0) - (K[L] ? 1 : 0)) * (p.cat ? 235 : 195) * (p.rush || 1);
   if (p.vx) { p.face = Math.sign(p.vx); p.step += dt * 9; }
   const maxJumps = p.maxJumps = baseJumps + (wishT > 0 && !p.cat ? 1 : 0);
-  if (hit[J] && p.jumps < maxJumps) { p.vy = p.cat ? -600 : -580; p.jumps++; p.ground = false; sfx.jump(p.cat); }
-  if (keys[J] && p.vy < -180) p.vy += g * dt * -0.35;    // hold for a higher hop
+  if (KH[J] && p.jumps < maxJumps) { p.vy = p.cat ? -600 : -580; p.jumps++; p.ground = false; sfx.jump(p.cat); }
+  if (K[J] && p.vy < -180) p.vy += g * dt * -0.35;       // hold for a higher hop
   p.vy = Math.min(p.vy + g * dt, 950);
 
   p.ground = false;
   const bro = p.cat ? tiger : cat;
   const footY = p.y + p.h;
   moveAxis(p, (p.vx + (p.riding ? bro.vx : 0)) * dt, 0, false);
-  moveAxis(p, 0, p.vy * dt, keys[Dn]);
+  moveAxis(p, 0, p.vy * dt, K[Dn]);
 
   p.riding = false;                                     // stand on your brother
   const perch = { x: bro.x - 2, y: bro.y - 2, w: bro.w + 4, h: bro.h + 4 };  // 2px so he doesn't jitter
@@ -792,8 +817,11 @@ function hud() {
     ctx.textAlign = 'left';
   }
   ctx.fillStyle = wishT > 0 ? '#ffe27a' : wish ? '#a8ffcf' : '#ffffff30';
-  ctx.fillText(wishT > 0 ? `WISH — swapped talents, ${wishT.toFixed(1)}s`
-             : wish ? 'Q — wish: swap talents for 8s' : 'wish spent', 660, 20);
+  ctx.fillText(wishT > 0 ? `WISH ${wishT.toFixed(1)}s` : wish ? 'Q — swap talents 8s' : 'wish spent', 640, 20);
+  ctx.fillStyle = '#8fd0ff';
+  ctx.fillText(auto.cat || auto.tiger
+    ? `AUTO ${auto.cat ? '🐱' : ''}${auto.tiger ? '🐯' : ''} — press a key to take over`
+    : '1 / 2 — autopilot', 790, 20);
 }
 
 function card(title, sub, body, foot, accent) {
@@ -827,6 +855,10 @@ function step(dt) {
   if (hit.KeyQ && wish) { wish = false; wishT = 8; sfx.wish(); }
   wishT = Math.max(0, wishT - dt);
 
+  if (hit.Digit1) auto.cat = !auto.cat;
+  if (hit.Digit2) auto.tiger = !auto.tiger;
+  autopilot(cat, 'KeyA', 'KeyD', 'KeyW', 'KeyS');
+  autopilot(tiger, 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown');
   updatePlayer(cat, dt, 'KeyA', 'KeyD', 'KeyW', 'KeyS', 2);
   updatePlayer(tiger, dt, 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 1);
   foes.forEach(f => updateFoe(f, dt));
