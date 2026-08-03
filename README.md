@@ -42,6 +42,10 @@ talent (the cat can shoulder through crates, the tiger gets a second jump).
 A black bar over each brother's head shows his jumps: **green = he can jump, red = spent**. One slot
 for the tiger, two for the cat, three under a wish. Walking off a ledge does not cost anything — the
 jump is yours until you use it, and the slot goes red only when you do.
+
+**The tiger is heavy.** Every time he lands from a jump he needs to get his breath back — a random
+**1 to 5 seconds** — and cannot jump again until he has. His slot refills green from the left as he
+recovers, so you can see when he is ready. The cat is never winded.
 `P` pauses — the music stops with it · `R` restarts the level · `Enter` turns a story card.
 
 ## Playing on your own

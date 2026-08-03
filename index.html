@@ -38,7 +38,8 @@
   <span><b>Q</b> — the Psammead grants <b>one wish per level</b>: for 8 seconds each brother gets the
   other's talent — the cat can smash crates, the tiger jumps twice. The black bar over a brother's
   head is his jumps: <b style="color:#2bff5a">green</b> = he can jump right now,
-  <b style="color:#ff1f33">red</b> = spent until he lands. Two slots for the cat, one for the tiger.</span>
+  <b style="color:#ff1f33">red</b> = spent. Two slots for the cat, one for the tiger — and the heavy
+  tiger needs <b>1–5 seconds</b> to get his breath back after every landing, which the slot fills in.</span>
   <span><button id=bugbtn>🐞 Report a bug (B)</button></span>
 </div>
 
@@ -113,7 +114,7 @@ const ERAS = [
   sky: ['#2c5f8a', '#7fc4d8'], far: 'sea', tint: '#2f7f9e',
   tile: ['#3f6f7a', '#578c96', '#7fb3ba'], token: '#ffffff', foe: 'eel',
   boss: { name: 'The Last Priest of Atlantis', hp: 4, speed: 86, hop: 1.1, colour: '#3a6f8e' },
-  water: { rise: 9 },   // floods the ground in ~13s, the top in ~100s
+  water: { rise: 6 },   // slow enough that a tiger resting 1-5s per jump can still climb
   says: [[3, "UP. Don't argue, don't collect anything, just UP."],
          [3, "UP. Don't argue, don't collect anything, just UP."]] },
 
@@ -356,7 +357,7 @@ const isWall = c => c === '#' || c === 'X';
 
 function mkPlayer(x, y, isCat) {
   return { x, y, w: isCat ? 20 : 26, h: isCat ? 24 : 28, vx: 0, vy: 0, ground: false,
-           jumps: 0, maxJumps: isCat ? 2 : 1, cat: isCat, face: 1, inv: 0, step: 0 };
+           jumps: 0, maxJumps: isCat ? 2 : 1, rest: 0, restMax: 1, cat: isCat, face: 1, inv: 0, step: 0 };
 }
 
 function loadLevel(n) {
@@ -481,7 +482,8 @@ function updatePlayer(p, dt, L, Rk, J, Dn, baseJumps) {
   p.vx = ((K[Rk] ? 1 : 0) - (K[L] ? 1 : 0)) * (p.cat ? 235 : 195) * (p.rush || 1);
   if (p.vx) { p.face = Math.sign(p.vx); p.step += dt * 9; }
   const maxJumps = p.maxJumps = baseJumps + (wishT > 0 && !p.cat ? 1 : 0);
-  if (KH[J] && p.jumps < maxJumps) { p.vy = p.cat ? -600 : -580; p.jumps++; p.ground = false; sfx.jump(p.cat); }
+  p.rest = Math.max(0, p.rest - dt);                     // the tiger is heavy: he needs a breather
+  if (KH[J] && p.jumps < maxJumps && !p.rest) { p.vy = p.cat ? -600 : -580; p.jumps++; p.ground = false; sfx.jump(p.cat); }
   if (K[J] && p.vy < -180) p.vy += g * dt * -0.35;       // hold for a higher hop
   p.vy = Math.min(p.vy + g * dt, 950);
 
@@ -496,7 +498,11 @@ function updatePlayer(p, dt, L, Rk, J, Dn, baseJumps) {
   if (p.vy >= 0 && overlap(p, perch) && footY <= bro.y + 8) {
     p.y = bro.y - p.h; p.vy = 0; p.ground = true; p.riding = true;
   }
-  if (p.ground) p.jumps = 0;    // walking off a ledge keeps the jump: green means he can jump, always
+  // walking off a ledge keeps the jump; landing after one costs the tiger 1-5s of getting his breath
+  if (p.ground) {
+    if (!p.cat && p.jumps) p.rest = p.restMax = 1 + Math.random() * 4;
+    p.jumps = 0;
+  }
 
   // hazards
   const cx = Math.floor((p.x + p.w / 2) / TS), cy = Math.floor((p.y + p.h - 4) / TS);
@@ -694,9 +700,15 @@ function drawFeline(p) {
     const tw = n * bw + (n - 1) * gap + pad * 2, bx = x + w / 2 - tw / 2, by = y - 24;
     ctx.fillStyle = '#000';           // a black plate, so green-on-orange still reads
     rr(bx, by, tw, bh + pad * 2, 3);
+    const filled = p.rest ? 1 - p.rest / p.restMax : 1;   // a resting tiger refills his slot visibly
     for (let i = 0; i < n; i++) {
-      ctx.fillStyle = i < n - p.jumps ? '#2bff5a' : '#ff1f33';   // left / spent
-      ctx.fillRect(bx + pad + i * (bw + gap), by + pad, bw, bh);
+      const sx = bx + pad + i * (bw + gap);
+      ctx.fillStyle = '#ff1f33';
+      ctx.fillRect(sx, by + pad, bw, bh);
+      if (i < n - p.jumps) {
+        ctx.fillStyle = '#2bff5a';
+        ctx.fillRect(sx, by + pad, bw * filled, bh);
+      }
     }
   }
   if (wishT > 0) {                                     // wish sparkle

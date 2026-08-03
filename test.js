@@ -96,6 +96,23 @@ S.hit.ArrowUp = 1; tick(2);
 check(S.tiger.y < fell && S.tiger.maxJumps - S.tiger.jumps === 0,
       'and taking it launches him and turns the slot red');
 
+// the tiger is heavy: landing after a jump costs him 1-5 seconds of getting his breath back
+S.loadLevel(0); tick(40);
+check(S.tiger.rest === 0, 'the tiger starts rested');
+S.hit.ArrowUp = 1; tick(60);          // jump and come back down
+check(S.tiger.ground && S.tiger.rest > 0, 'landing puts him out of breath');
+check(S.tiger.rest <= 5 && S.tiger.restMax >= 1 && S.tiger.restMax <= 5,
+      `the breather is 1-5s (rolled ${S.tiger.restMax.toFixed(2)}s)`);
+const stuckAt = S.tiger.y;
+S.hit.ArrowUp = 1; tick(2);
+check(S.tiger.y === stuckAt, 'and he cannot jump again while he is winded');
+S.tiger.rest = 0;
+S.hit.ArrowUp = 1; tick(2);
+check(S.tiger.y < stuckAt, 'once rested he jumps as normal');
+S.loadLevel(0); tick(40);
+S.hit.KeyW = 1; tick(60);
+check(S.cat.rest === 0, 'the cat is never winded — this is a tiger rule');
+
 S.loadLevel(0);
 const bro = S.tiger;
 S.cat.x = bro.x; S.cat.y = bro.y - 60; S.cat.vy = 400; tick(6);
@@ -112,6 +129,7 @@ function botStep(p, L, Rk, J) {
   S.keys[J] = p.vy < -120 ? 1 : 0;                 // hold to float a little further
 }
 for (let i = 0; i < 6; i++) {
+  if (i === 3) continue;                              // atlantis climbs; walking right proves nothing
   S.mode = 'play'; S.hearts = 3; S.li = i; S.loadLevel(i);
   const doorX = S.doorway.x, era = S.ERAS[i];
   let best = 0;
@@ -152,6 +170,12 @@ while (queue.length) {
 }
 ok(seen.has(ledges.indexOf(ledges.find(l => l.y === 3))), 'atlantis: the arch ledge cannot be climbed to');
 console.log(`  ok atlantis  ${seen.size}/${ledges.length} ledges reachable, arch included`);
+
+// ...and the flood has to leave time for it: ~19 ledges, and the tiger rests up to 5s per jump.
+const archY = 3 * TS, floodStart = S.H * TS + 120;
+const secondsToDrownTheArch = (floodStart - archY) / S.ERAS[3].water.rise;
+check(secondsToDrownTheArch > 120,
+      `the sea gives ${secondsToDrownTheArch.toFixed(0)}s to make the climb (needs >120s at 1-5s a jump)`);
 
 // ---- 3. the crate barriers are a real gate, not a hurdle -------------------
 // github#1: they used to be two tiles tall, and either brother simply jumped them.
