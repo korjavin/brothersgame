@@ -32,7 +32,8 @@ class FakeAudio {
                                   start(at) { notes.push({ kind: 'noise', at }); } }; }
   createBiquadFilter() { return { type: '', frequency: param(), connect() {} }; }
   createBuffer(ch, len) { return { getChannelData: () => new Float32Array(len) }; }
-  resume() {}
+  suspend() { this.state = 'suspended'; }
+  resume() { this.state = 'running'; }
 }
 
 const sandbox = { document: { getElementById: () => el, createElement: () => el },
@@ -47,7 +48,7 @@ vm.runInContext(src + `
   get hearts(){return hearts}, set hearts(v){hearts=v}, get score(){return score},
   get cat(){return cat}, get tiger(){return tiger}, get foes(){return foes}, get tokens(){return tokens},
   get map(){return map}, get doorway(){return doorway}, get water(){return water}, get boss(){return boss},
-  openReport, closeReport, refreshLink, whereAmI, get sendLink(){return sendLink}, get bugtext(){return bugtext},
+  openReport, closeReport, refreshLink, whereAmI, togglePause, get paused(){return paused}, get sendLink(){return sendLink}, get bugtext(){return bugtext},
   get reporting(){return reporting},
   get W(){return W}, get H(){return H} };`, sandbox);
 
@@ -287,6 +288,24 @@ const resumed = notes.length;
 runSeconds(1);
 ok(notes.length - resumed < 60, 'unmute dumped a backlog of notes');
 console.log('  ok mute is silent, unmute resumes cleanly');
+
+// ---- 7. pause -------------------------------------------------------------
+console.log('\npause');
+S.mode = 'play'; S.li = 0; S.loadLevel(0); S.hearts = 3; tick(20);
+const restX = S.cat.x, restT = S.tiger.x;
+S.togglePause();
+check(S.paused && S.SND.ctx.state === 'suspended', 'P pauses and suspends the audio context');
+S.keys.KeyD = 1; S.keys.ArrowRight = 1;
+const quiet = notes.length;
+tick(30); runSeconds(2);
+check(S.cat.x === restX && S.tiger.x === restT, 'held keys move nobody while paused');
+check(notes.length === quiet, `the music stops (${notes.length - quiet} notes leaked)`);
+S.togglePause();
+check(!S.paused && S.SND.ctx.state === 'running', 'P again resumes the game and the music');
+S.keys.KeyD = 1;                      // pausing drops held keys, so nobody bolts on resume
+tick(10);
+check(S.cat.x > restX, 'and the brothers move again');
+S.keys.KeyD = S.keys.ArrowRight = 0;
 
 console.log(failures ? `\n${failures} FAILURES\n` : '\nall checks passed\n');
 process.exit(failures ? 1 : 0);

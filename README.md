@@ -42,7 +42,7 @@ talent (the cat can shoulder through crates, the tiger gets a second jump).
 A black bar over each brother's head shows his jumps: **green = he can jump, red = spent**. One slot
 for the tiger, two for the cat, three under a wish. Walking off a ledge does not cost anything — the
 jump is yours until you use it, and the slot goes red only when you do.
-`R` restarts the level · `Enter` turns a story card.
+`P` pauses — the music stops with it · `R` restarts the level · `Enter` turns a story card.
 
 Neither brother gets through an arch without the other. The cat is fast and jumps twice; the
 tiger is slow and smashes crates. Either can stand on the other's shoulders — and gets carried.
