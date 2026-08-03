@@ -36,8 +36,9 @@
 </div>
 <div class=keys>
   <span><b>Q</b> — the Psammead grants <b>one wish per level</b>: for 8 seconds each brother gets the
-  other's talent — the cat can smash crates, the tiger jumps twice. The yellow pips over a brother's
-  head in mid-air are the jumps he has left.</span>
+  other's talent — the cat can smash crates, the tiger jumps twice. In mid-air a black bar over a
+  brother's head shows his jumps: <b style="color:#2bff5a">green</b> = still has one,
+  <b style="color:#ff1f33">red</b> = spent.</span>
   <span><button id=bugbtn>🐞 Report a bug (B)</button></span>
 </div>
 
@@ -659,9 +660,13 @@ function drawFeline(p) {
   ctx.arc(x + w * .32, y + h * .22, 2.3, 0, 7); ctx.arc(x + w * .68, y + h * .22, 2.3, 0, 7); ctx.fill();
   ctx.fillStyle = dark; ctx.beginPath(); ctx.arc(x + w / 2, y + h * .33, 2, 0, 7); ctx.fill();
   if (!p.ground) {                    // github#2: in the air you cannot tell what you have left
-    for (let i = 0; i < p.maxJumps; i++) {
-      ctx.fillStyle = i < p.maxJumps - p.jumps ? '#ffe27a' : '#00000044';
-      ctx.fillRect(x + w / 2 - p.maxJumps * 4 + i * 8, y - 16, 6, 4);
+    const n = p.maxJumps, bw = 10, bh = 8, pad = 3, gap = 3;
+    const tw = n * bw + (n - 1) * gap + pad * 2, bx = x + w / 2 - tw / 2, by = y - 24;
+    ctx.fillStyle = '#000';           // a black plate, so green-on-orange still reads
+    rr(bx, by, tw, bh + pad * 2, 3);
+    for (let i = 0; i < n; i++) {
+      ctx.fillStyle = i < n - p.jumps ? '#2bff5a' : '#ff1f33';   // left / spent
+      ctx.fillRect(bx + pad + i * (bw + gap), by + pad, bw, bh);
     }
   }
   if (wishT > 0) {                                     // wish sparkle
