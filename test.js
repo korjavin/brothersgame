@@ -80,8 +80,10 @@ const foe2 = S.foes[1];
 S.tiger.x = foe2.x - 2; S.tiger.y = foe2.y; S.tiger.vy = 0; S.tiger.inv = 0; tick(2);
 check(S.hearts === 2, 'walking into a foe costs a heart');
 
-// github#2: the pips over an airborne brother's head read maxJumps - jumps
+// github#2: the pips over a brother's head read maxJumps - jumps, on the ground as well as in the air
 S.loadLevel(0); tick(40);
+check(S.cat.maxJumps - S.cat.jumps === 2, `the cat stands with both jumps lit (${S.cat.maxJumps - S.cat.jumps})`);
+check(S.tiger.maxJumps - S.tiger.jumps === 1, `the tiger stands with his one jump lit (${S.tiger.maxJumps - S.tiger.jumps})`);
 S.hit.KeyW = 1; tick(2);
 check(S.cat.maxJumps - S.cat.jumps === 1, `the cat shows one jump left after his first (${S.cat.maxJumps - S.cat.jumps})`);
 S.tiger.ground = false; S.tiger.jumps = 1; S.tiger.y -= 40; tick(1);

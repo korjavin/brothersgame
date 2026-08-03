@@ -36,9 +36,9 @@
 </div>
 <div class=keys>
   <span><b>Q</b> — the Psammead grants <b>one wish per level</b>: for 8 seconds each brother gets the
-  other's talent — the cat can smash crates, the tiger jumps twice. In mid-air a black bar over a
-  brother's head shows his jumps: <b style="color:#2bff5a">green</b> = still has one,
-  <b style="color:#ff1f33">red</b> = spent.</span>
+  other's talent — the cat can smash crates, the tiger jumps twice. The black bar over a brother's
+  head is his jumps: <b style="color:#2bff5a">green</b> = available,
+  <b style="color:#ff1f33">red</b> = spent. Two slots for the cat, one for the tiger.</span>
   <span><button id=bugbtn>🐞 Report a bug (B)</button></span>
 </div>
 
@@ -348,7 +348,7 @@ const isWall = c => c === '#' || c === 'X';
 
 function mkPlayer(x, y, isCat) {
   return { x, y, w: isCat ? 20 : 26, h: isCat ? 24 : 28, vx: 0, vy: 0, ground: false,
-           jumps: 0, cat: isCat, face: 1, inv: 0, step: 0 };
+           jumps: 0, maxJumps: isCat ? 2 : 1, cat: isCat, face: 1, inv: 0, step: 0 };
 }
 
 function loadLevel(n) {
@@ -659,8 +659,8 @@ function drawFeline(p) {
   ctx.fillStyle = '#1a1a22'; ctx.beginPath();
   ctx.arc(x + w * .32, y + h * .22, 2.3, 0, 7); ctx.arc(x + w * .68, y + h * .22, 2.3, 0, 7); ctx.fill();
   ctx.fillStyle = dark; ctx.beginPath(); ctx.arc(x + w / 2, y + h * .33, 2, 0, 7); ctx.fill();
-  if (!p.ground) {                    // github#2: in the air you cannot tell what you have left
-    const n = p.maxJumps, bw = 10, bh = 8, pad = 3, gap = 3;
+  {                                   // github#2: always on — in the air the first jump is already
+    const n = p.maxJumps, bw = 10, bh = 8, pad = 3, gap = 3;   // spent, so "all green" was invisible
     const tw = n * bw + (n - 1) * gap + pad * 2, bx = x + w / 2 - tw / 2, by = y - 24;
     ctx.fillStyle = '#000';           // a black plate, so green-on-orange still reads
     rr(bx, by, tw, bh + pad * 2, 3);
